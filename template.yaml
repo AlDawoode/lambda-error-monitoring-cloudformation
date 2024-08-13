@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  This CloudFormation template sets up an SNS topic for error notifications from any Lambda function in the account,  creates an SNS subscription to receive email notifications, and configures a CloudWatch alarm  that monitors all Lambda functions for errors.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: "dev"
+    Description: "Specify the environment for which the CloudWatch alarm is being configured"
+
+  EmailAddress:
+    Type: String
+    Description: "The email address to subscribe to the SNS topic for lambda error notifications."
+
+
+Resources:
+  # SNS Topic for Alarm Notifications
+  AlarmNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: MonitorAllLambdaErrorNotificationTopic
+
+  # SNS Topic Subscription (Email)
+  AlarmNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      Endpoint: !Ref EmailAddress
+      TopicArn: !Ref AlarmNotificationTopic
+
+  # CloudWatch Alarm for All Lambda Errors
+  AllLambdaErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "${Environment}-AllLambdaFunctionsErrorAlarm"
+      AlarmDescription: Alarm for monitoring errors across all Lambda functions using
+        built-in metrics.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Statistic: Sum
+      Period: 60 # 1 minute
+      EvaluationPeriods: 1
+      Threshold: 1 # Trigger if any error occurs
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlarmNotificationTopic
+
+Outputs:
+  SNSSubscription:
+    Description: SNS subscription for Lambda error notifications
+    Value: !Ref AlarmNotificationSubscription
+
+  AlarmName:
+    Description: CloudWatch Alarm for all Lambda errors
+    Value: !Ref AllLambdaErrorAlarm
